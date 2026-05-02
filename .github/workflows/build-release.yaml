@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release-tag:
-        description: 'Release Tag (v2.x.x)'
+        description: 'Release Tag (v2.x.x or v2.x.x-modN)'
         required: true
 
 jobs:
@@ -54,12 +54,32 @@ jobs:
         id: process-version
         run: |
           VERSION_TAG=${{ inputs.release-tag }}
-          VERSION_TAG=${VERSION_TAG#v}                              # remove the 'v' prefix
-          IFS='.' read -ra VERSION_PARTS <<< "$VERSION_TAG"         # split into array
-          VERSION_CODE=$(printf "%1d%02d%03d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}")
-          
-          echo "versonName=$VERSION_TAG" >> $GITHUB_OUTPUT          # "1.2.3"
-          echo "versonCode=$VERSION_CODE" >> $GITHUB_OUTPUT         # "102003"
+          VERSION_TAG=${VERSION_TAG#v}                              # remove the 'v' prefix -> e.g. "2.11.27-mod1" or "2.11.27"
+
+          BASE_VERSION=${VERSION_TAG%%-*}                           # numeric part before the first '-', e.g. "2.11.27"
+          MOD_SUFFIX=""
+          if [ "$VERSION_TAG" != "$BASE_VERSION" ]; then
+            MOD_SUFFIX=${VERSION_TAG#${BASE_VERSION}-}              # "mod1"
+          fi
+
+          if ! [[ "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid base version: $BASE_VERSION" >&2
+            exit 1
+          fi
+
+          IFS='.' read -ra VERSION_PARTS <<< "$BASE_VERSION"       # split into array
+          BASE_CODE=$(printf "%1d%02d%03d" "${VERSION_PARTS[0]}" "${VERSION_PARTS[1]}" "${VERSION_PARTS[2]}")
+
+          # If suffix ends with digits (e.g. mod1, mod12), append a 2-digit modifier
+          # so that different mod builds get different versionCodes.
+          MOD_NUM=0
+          if [[ "$MOD_SUFFIX" =~ ([0-9]+)$ ]]; then
+            MOD_NUM=${BASH_REMATCH[1]}
+          fi
+          VERSION_CODE=$(printf "%d%02d" "$BASE_CODE" "$MOD_NUM")   # e.g. 211027 + 01 -> 21102701
+
+          echo "versonName=$VERSION_TAG" >> $GITHUB_OUTPUT          # "2.11.27-mod1" or "2.11.27"
+          echo "versonCode=$VERSION_CODE" >> $GITHUB_OUTPUT         # "21102701" or "21102700"
       
       # Re-write version in build.gradle.kts
       - name: Re-write version
