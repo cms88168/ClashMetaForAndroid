@@ -15,7 +15,14 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Checkout submodules
-        run: git submodule update --init --recursive --force
+        run: |
+          # Always pull the latest commit from the tracked branch configured in .gitmodules
+          # (clash-foss -> branch=Alpha), so CI picks up mihomo changes (e.g. cmcc support)
+          # even if the submodule pointer in the parent repo has not been bumped yet.
+          git submodule sync --recursive
+          git submodule update --init --recursive --force --remote
+          echo "==== submodule HEAD ===="
+          git -C core/src/foss/golang/clash log -1 --pretty=oneline
 
       - name: Setup Java
         uses: actions/setup-java@v5
