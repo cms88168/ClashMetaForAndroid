@@ -40,6 +40,7 @@ data class Proxy(
         Sudoku(false),
         Masque(false),
         TrustTunnel(false),
+        Cmcc(false),
 
 
         Relay(true),
